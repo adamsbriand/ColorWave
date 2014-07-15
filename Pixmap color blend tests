@@ -1,0 +1,136 @@
+package com.connorjbracy.pixmaptest;
+
+import java.util.ArrayList;
+
+import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Gdx2DPixmap;
+import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+
+public class PixmapTest extends ApplicationAdapter {
+	
+	SpriteBatch batch;
+	ArrayList<Sprite> sprites;
+
+	Texture textureFromPixmap (Gdx2DPixmap pixmap) {
+		
+		Texture texture = new Texture(pixmap.getWidth(), pixmap.getHeight(), Format.RGBA8888);
+		texture.bind();
+		Gdx.gl.glTexImage2D(GL20.GL_TEXTURE_2D, 
+							0, 
+							pixmap.getGLInternalFormat(), 
+							pixmap.getWidth(),
+							pixmap.getHeight(), 
+							0, 
+							pixmap.getGLFormat(), 
+							pixmap.getGLType(), 
+							pixmap.getPixels());
+		return texture;
+		
+	}
+
+	void drawToPixmap (Gdx2DPixmap pixmap) {
+		
+		pixmap.clear(Color.rgba8888(1, 1, 1, 1f));
+		
+		float gradientScale = (1.0f / (float)pixmap.getWidth()); 
+		
+		float alpGrad = 1.0f;
+		
+		float redGrad = 1.0f;
+		
+		float grnGrad = 0.0f;
+		
+		float bluGrad = -1.0f;
+		
+		float gradCap = 1.0f;
+		
+		for(int iRow = 0; iRow < pixmap.getHeight(); ++iRow) {
+			for(int iCol = 0; iCol < pixmap.getWidth(); ++iCol) {
+				
+				if(alpGrad > 0.0f) alpGrad += gradientScale;
+				
+				if(redGrad > 0.0f) redGrad -= gradientScale;
+				
+				if(grnGrad < gradCap) grnGrad += gradientScale;
+				
+				if(bluGrad < gradCap) bluGrad += gradientScale;
+				
+				pixmap.setPixel(iCol, iRow, Color.rgba8888(redGrad, 
+														   ( (grnGrad < 0.0f)? 0.0f : grnGrad ), 
+														   ( (bluGrad < 0.0f)? 0.0f : bluGrad ),
+														   ( (alpGrad > 1.0f)? 1.0f : alpGrad )));
+				
+			}
+			
+			alpGrad = (1.0f - (iRow * gradientScale));
+			redGrad = (1.0f - (iRow * gradientScale));
+			grnGrad = (0.0f - (iRow * gradientScale));
+			bluGrad = (-1.0f + (iRow * gradientScale));
+			
+		}
+	}
+
+	Gdx2DPixmap[] testPixmaps () {
+		
+		int[] formats = {Gdx2DPixmap.GDX2D_FORMAT_RGBA8888};
+		Gdx2DPixmap[] pixmaps = new Gdx2DPixmap[formats.length];
+		
+		for(int i = 0; i < pixmaps.length; i++) {
+			Gdx2DPixmap pixmap = new Gdx2DPixmap(500, 500, formats[i]);
+			drawToPixmap(pixmap);
+			pixmaps[i] = pixmap;
+		}
+		
+		return pixmaps;
+		
+	}
+
+	@Override
+	public void create () {
+		
+		batch = new SpriteBatch();
+		sprites = new ArrayList<Sprite>();
+		Gdx2DPixmap[] pixmaps = testPixmaps();
+		
+		Gdx2DPixmap composite = new Gdx2DPixmap(500, 500, Gdx2DPixmap.GDX2D_FORMAT_RGBA8888);
+		composite.clear(0);
+		Gdx2DPixmap.setBlend(Gdx2DPixmap.GDX2D_BLEND_SRC_OVER);
+		
+		for(int i = 0; i < pixmaps.length; i++) {
+			
+			Gdx2DPixmap.setScale(Gdx2DPixmap.GDX2D_SCALE_NEAREST);
+			Sprite sprite = new Sprite(textureFromPixmap(pixmaps[i]));
+			sprite.setPosition(0, 0);
+			sprites.add(sprite);
+			
+		}
+		
+	}
+
+	@Override
+	public void render () {
+		
+		Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+		
+		batch.begin();
+		
+		for (int i = 0; i < sprites.size(); i++) {
+			sprites.get(i).draw(batch);
+		}
+		
+		batch.end();
+		
+	}
+
+	public boolean needsGL20 () {
+		return false;
+	}
+	
+}
