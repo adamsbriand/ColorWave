@@ -1,0 +1,244 @@
+package com.connorjbracy.pixmapblendtest;
+
+import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.g2d.Gdx2DPixmap;
+import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.MathUtils;
+
+public class PixmapBlendTest extends ApplicationAdapter {
+		
+	public static float test_dt;
+	
+	public static enum RGB {R, G, B, N};
+	
+	private int PIX_RAD;
+	private int PIX_DIAMETER;
+	private final int PIX_DIM = 25; // = 25x25 pixel grid
+	private float GRADIENT; // variable to gradient color as it extends radial from the pixel origin
+		
+	SpriteBatch batch;
+	Sprite texSprite;
+	Gdx2DPixmap pixmap;
+	RGB[][] gamePix;
+	Color[][] buffPix;
+	
+	@Override
+	public void create () {
+		
+		batch = new SpriteBatch();
+		pixmap = new Gdx2DPixmap(500, 500, Gdx2DPixmap.GDX2D_FORMAT_RGBA8888);
+		Gdx2DPixmap.setBlend(Gdx2DPixmap.GDX2D_BLEND_NONE);
+		
+		PIX_DIAMETER = (int)((2.0f * (float)pixmap.getWidth()) / (float)PIX_DIM);
+		PIX_RAD = PIX_DIAMETER / 2;
+		GRADIENT = 1.0f / (float)PIX_RAD;		
+				
+		gamePix = new RGB[PIX_DIM + 1][PIX_DIM + 1];
+		buffPix = new Color[pixmap.getWidth()][pixmap.getHeight()];
+				
+		/* Sequentially instantiates the GamePixel grid */
+		for(int iRow = 0, step = 0; iRow <= PIX_DIM; ++iRow) {
+			for(int iCol = 0; iCol <= PIX_DIM; ++iCol) {
+				
+				//switch( MathUtils.random(0, 3) ) {
+				switch(step++) {
+				case 0: gamePix[iRow][iCol] = RGB.R;
+					break;
+				case 1: gamePix[iRow][iCol] = RGB.G;
+					break;
+				case 2: gamePix[iRow][iCol] = RGB.B;
+					//break;
+				//case 3: gamePix[iRow][iCol] = RGB.A;
+				//	break;
+				//case 3: gamePix[iRow][iCol] = RGB.N;
+				default:step = 0;
+				}
+				
+			} // end iCol
+		} // end iRow
+		
+		drawGamePixToBuff();
+		
+		texSprite = new Sprite(textureFromPixmap());
+		
+		texSprite.setPosition(0, 0);
+		
+	}
+
+	@Override
+	public void render () {
+		
+		drawGamePixToBuff();
+		
+		Gdx.gl.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+		
+		batch.begin();
+		
+		texSprite.draw(batch);
+		
+		batch.end();
+		
+	}
+	
+	
+	/* Updates our custom, gradient pixels into 
+	 * the pixel array for the buffer to be drawn 
+	 * with then calls the draw to buffer method */
+	private void drawGamePixToBuff() {
+				
+		clearBuffAndPixmap();
+		
+		for(int iPixRow = 0; iPixRow <= PIX_DIM; ++iPixRow) {
+			for(int iPixCol = 0; iPixCol <= PIX_DIM; ++iPixCol) {
+						
+				addColor((iPixCol * PIX_RAD), // yOrigin and xOrigin coordinates in
+						 (iPixRow * PIX_RAD), // buffer-grid units instead of GamePixel-grid units 
+						 gamePix[iPixRow][iPixCol]);
+				
+			} // end iPixCol (gradient circle x-coords)
+		} // end iPixRow (gradient circle y-coords)
+				
+		drawBuffToPixmap();
+		
+		texSprite = new Sprite(textureFromPixmap());
+		texSprite.setPosition(0,0);
+		
+	}
+	
+	/* Generates a value to set a pixel to 
+	 * based on the pixel's location in 
+	 * relation to the GamePixel that is 
+	 * currently being put into the buffer */
+	private void addColor(int xCoord, int yCoord, RGB color) {
+				
+		for(int iBuffRow = -PIX_RAD; iBuffRow < PIX_RAD; ++iBuffRow) {
+			for(int iBuffCol = -PIX_RAD; iBuffCol < PIX_RAD; ++iBuffCol) {
+				
+				// if it is about to draw off the screen, don't.
+				if( ( (xCoord + iBuffRow) < 0 || (yCoord + iBuffCol) < 0 ) ||
+					( (xCoord + iBuffRow) >= 500 || (yCoord + iBuffCol) >= 500 ) ) continue;
+				
+				switch(color) {
+				case R: 
+					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].r += getColorVal(iBuffCol, iBuffRow);
+					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].r > 1.0f){
+						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].r = 1.0f;
+					}
+					break;
+				case G:
+					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].g += getColorVal(iBuffCol, iBuffRow);
+					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].g > 1.0f){
+						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].g = 1.0f;
+					}
+					break;
+				case B:
+					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].b += getColorVal(iBuffCol, iBuffRow);
+					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].b > 1.0f){
+						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].b = 1.0f;
+					}
+					break;
+//				case A:
+//					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].a -= getColorVal(iBuffCol, iBuffRow);
+//					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].a < 0.0f){
+//						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].a = 0.0f;
+//					}
+//					break;
+				case N:
+				default:
+				}
+				
+			} // end iBuffCol (buffer-grid pixel x-coords)
+		} // end iBuffRow (buffer-grid pixel x-coords)
+		
+	}
+	
+	/* Calculates the value the color being 
+	 * added should be weighted by and returns 
+	 * it to be reflected in the buffer */
+	private float getColorVal(int xOffset, int yOffset) {
+		float retVal = 1.0f - (GRADIENT * (float)Math.sqrt( (xOffset * xOffset) + (yOffset * yOffset) ) );
+		return ((retVal < 0.0f)? 0.0f : retVal);
+	}
+	
+	/* Transfers the calculated color values  
+	 * from the buffer into the pixmap */
+	private void drawBuffToPixmap() {
+		
+		for(int iRow = 0; iRow < pixmap.getHeight(); ++iRow) {
+			for(int iCol = 0; iCol < pixmap.getWidth(); ++iCol) {
+				pixmap.setPixel(iCol, iRow, Color.rgba8888(buffPix[iRow][iCol]));
+			}
+		}
+		
+	}
+	
+	/* Clears the pixmap, buffer, and updates the 
+	 * GamePixel colors if enough time has passed 
+	 * (last part is for debugging/proof of concept) */
+	private void clearBuffAndPixmap() {
+		
+		test_dt += Gdx.graphics.getDeltaTime();
+		if(test_dt >= 5.0f) {
+			updateGamePix();
+			test_dt = 0.0f;
+		}
+		
+		pixmap.clear(Color.rgba8888(0.0f, 0.0f, 0.0f, 1.0f));
+		
+		for(int iRow = 0; iRow < pixmap.getHeight(); ++iRow) {
+			for(int iCol = 0; iCol < pixmap.getWidth(); ++iCol) {
+				buffPix[iRow][iCol] = new Color(0.0f, 0.0f, 0.0f, 1.0f);
+			}
+		}
+		
+	}
+	
+	/* Randomly regenerates the 
+	 * color each GamePixel is assigned */
+	private void updateGamePix() {
+		for(int iRow = 0; iRow < PIX_DIM; ++iRow) {
+			for(int iCol = 0; iCol < PIX_DIM; ++iCol) {
+				
+				switch( MathUtils.random(0, 4) ) {
+				case 0: gamePix[iRow][iCol] = RGB.R;
+					break;
+				case 1: gamePix[iRow][iCol] = RGB.G;
+					break;
+				case 2: gamePix[iRow][iCol] = RGB.B;
+					break;
+				//case 3: gamePix[iRow][iCol] = RGB.A;
+				//	break;
+				case 3: gamePix[iRow][iCol] = RGB.N;
+				default:
+				}
+			}
+		}
+	}
+	
+	/* Converts the pixmap into a 
+	 * texture to be rendered to the screen */
+	Texture textureFromPixmap() {
+		
+		Texture texture = new Texture(pixmap.getWidth(), pixmap.getHeight(), Format.RGBA8888);
+		texture.bind();
+		Gdx.gl.glTexImage2D(GL20.GL_TEXTURE_2D, 
+							0, 
+							pixmap.getGLInternalFormat(), 
+							pixmap.getWidth(),
+							pixmap.getHeight(), 
+							0, 
+							pixmap.getGLFormat(), 
+							pixmap.getGLType(), 
+							pixmap.getPixels());
+		return texture;
+		
+	}
+	
+}
