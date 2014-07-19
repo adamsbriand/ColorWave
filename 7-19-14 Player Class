@@ -1,0 +1,41 @@
+package com.connorjbracy.pixmapblendtest;
+
+import global.G;
+import global.G._RGB;
+
+import com.badlogic.gdx.Gdx;
+
+public class Player {
+	
+	private _RGB color;
+	private float pulseOriginX;
+	private float pulseOriginY;
+	private float dtPulseRad;
+	private boolean sendPulse;
+	
+	public Player(_RGB color, float startPulseOriginX, float startPulseOriginY) {
+		this.color = color;
+		pulseOriginX = startPulseOriginX;
+		pulseOriginY = startPulseOriginY;
+		sendPulse = true;
+	}
+	
+	public float getPulseX() { return pulseOriginX; }
+	public float getPulseY() { return pulseOriginY; }
+	public _RGB  getColor()  { return color; }
+	public boolean sendPulse() {
+		if(sendPulse) {
+			dtPulseRad += G.i().PIX_DIM * Gdx.graphics.getDeltaTime();
+		}
+		return sendPulse; 
+	}
+	
+	public boolean inPulseRad(int xCoord, int yCoord) {
+		if(dtPulseRad > Gdx.graphics.getWidth() || dtPulseRad > Gdx.graphics.getWidth()) {
+			sendPulse = false;
+			dtPulseRad = 0.0f;
+		}
+		return (((int)dtPulseRad == (int)Math.sqrt( (xCoord * xCoord) + (yCoord * yCoord) ) )? true : false);
+	}
+	
+}
