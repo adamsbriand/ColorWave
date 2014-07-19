@@ -1,0 +1,233 @@
+package com.connorjbracy.pixmapblendtest;
+
+import global.G;
+
+import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Gdx2DPixmap;
+import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+
+public class PixmapBlendTest extends ApplicationAdapter {
+
+	private Player red;
+	
+	SpriteBatch batch;
+	Sprite texSprite;
+	Gdx2DPixmap pixmap;
+	GamePixel[][] gamePix;
+	Color[][] buffPix;
+	
+	@Override
+	public void create () {
+		
+		red = new Player(G.i().RGB.R, 0.0f, 0.0f);
+		
+		batch = new SpriteBatch();
+		pixmap = new Gdx2DPixmap(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), Gdx2DPixmap.GDX2D_FORMAT_RGBA8888);
+		Gdx2DPixmap.setBlend(Gdx2DPixmap.GDX2D_BLEND_NONE);
+
+		gamePix = new GamePixel[G.i().PIX_DIM + 1][G.i().PIX_DIM + 1];
+		buffPix = new Color[pixmap.getWidth()][pixmap.getHeight()];
+				
+		/* instantiates the GamePixel grid */
+		for(int iRow = 0; iRow <= G.i().PIX_DIM; ++iRow) {
+			for(int iCol = 0; iCol <= G.i().PIX_DIM; ++iCol) {
+				gamePix[iRow][iCol] = new GamePixel(G.i().RGB.R);
+				
+			} // end iCol
+		} // end iRow
+		
+		//updateGamePix();
+		
+		drawGamePixToBuff();
+		
+		texSprite = new Sprite(textureFromPixmap());
+		
+		texSprite.setPosition(0, 0);
+		
+	}
+
+	@Override
+	public void render () {
+		
+		System.out.println(Gdx.graphics.getDeltaTime());
+		
+		drawGamePixToBuff();
+		
+		Gdx.gl.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+		
+		batch.begin();
+		
+		texSprite.draw(batch);
+		
+		batch.end();
+		
+	}
+	
+	
+	/* Updates our custom, gradient pixels into 
+	 * the pixel array for the buffer to be drawn 
+	 * with then calls the draw to buffer method */
+	private void drawGamePixToBuff() {
+				
+		clearBuffAndPixmap();
+		
+		/* VV Playing around with optimizing processing time VV */
+		int max = (G.i().PIX_RAD * G.i().PIX_DIM);
+		
+		for(int iPixRow = 0, iRow = 0; iPixRow <= max; iPixRow += G.i().PIX_RAD, ++iRow) {
+			for(int iPixCol = 0, iCol = 0; iPixCol <= max; iPixCol += G.i().PIX_RAD, ++iCol) {
+						
+				addColor((iPixCol ), // yOrigin and xOrigin coordinates in
+						 (iPixRow), // buffer-grid units instead of GamePixel-grid units 
+						 gamePix[iRow][iCol]);
+				
+			} // end iPixCol (gradient circle x-coords)
+		} // end iPixRow (gradient circle y-coords)
+				
+		drawBuffToPixmap();
+		
+		texSprite = new Sprite(textureFromPixmap());
+		texSprite.setPosition(0,0);
+		
+	}
+	
+	/* Generates a value to set a pixel to 
+	 * based on the pixel's location in 
+	 * relation to the GamePixel that is 
+	 * currently being put into the buffer */
+	private void addColor(int xCoord, int yCoord, GamePixel color) {
+				
+		for(int iBuffRow = -G.i().PIX_RAD; iBuffRow < G.i().PIX_RAD; ++iBuffRow) {
+			for(int iBuffCol = -G.i().PIX_RAD; iBuffCol < G.i().PIX_RAD; ++iBuffCol) {
+				
+				// if it is about to draw off the screen, don't.
+				if( ( (xCoord + iBuffRow) < 0 || (yCoord + iBuffCol) < 0 ) ||
+					( (xCoord + iBuffRow) >= Gdx.graphics.getHeight() || (yCoord + iBuffCol) >= Gdx.graphics.getWidth() ) ) continue;
+				
+				switch(color.getColor()) {
+				case R: 
+					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].r += color.getColorVal(iBuffCol, iBuffRow);
+					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].r > 1.0f){
+						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].r = 1.0f;
+					}
+					break;
+				case G:
+					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].g += color.getColorVal(iBuffCol, iBuffRow);
+					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].g > 1.0f){
+						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].g = 1.0f;
+					}
+					break;
+				case B:
+					buffPix[xCoord + iBuffRow][yCoord + iBuffCol].b += color.getColorVal(iBuffCol, iBuffRow);
+					if(buffPix[xCoord + iBuffRow][yCoord + iBuffCol].b > 1.0f){
+						buffPix[xCoord + iBuffRow][yCoord + iBuffCol].b = 1.0f;
+					}
+					break;
+				case N:
+				default:
+				}
+				
+			} // end iBuffCol (buffer-grid pixel x-coords)
+		} // end iBuffRow (buffer-grid pixel x-coords)
+		
+	}
+		
+	/* Transfers the calculated color values  
+	 * from the buffer into the pixmap */
+	private void drawBuffToPixmap() {
+		
+		for(int iRow = 0; iRow < pixmap.getHeight(); ++iRow) {
+			for(int iCol = 0; iCol < pixmap.getWidth(); ++iCol) {
+				pixmap.setPixel(iCol, iRow, Color.rgba8888(buffPix[iRow][iCol]));
+			}
+		}
+		
+	}
+	
+	/* Clears the pixmap, buffer, and updates the 
+	 * GamePixel colors if enough time has passed 
+	 * (last part is for debugging/proof of concept) */
+	private void clearBuffAndPixmap() {
+		
+		G.i().test_dt += Gdx.graphics.getDeltaTime();
+		if(G.i().test_dt >= 0.5f) {
+			if(red.sendPulse()) pulse(red);
+			G.i().test_dt = 0.0f;
+		}
+		
+		pixmap.clear(Color.rgba8888(0.0f, 0.0f, 0.0f, 1.0f));
+		
+		for(int iRow = 0; iRow < pixmap.getHeight(); ++iRow) {
+			for(int iCol = 0; iCol < pixmap.getWidth(); ++iCol) {
+				buffPix[iRow][iCol] = new Color(0.0f, 0.0f, 0.0f, 1.0f);
+			}
+		}
+		
+	}
+		
+	private void pulse(Player player) {
+		
+//		for(int iRow = 0; iRow < pixmap.getHeight(); ++iRow) {
+//			for(int iCol = 0; iCol < pixmap.getWidth(); ++iCol) {
+//				if(player.inPulseRad(iRow, iCol)) {
+//					if(iRow % G.i().PIX_RAD == 0 && iCol % G.i().PIX_RAD == 0) {
+//						if(gamePix[iRow / G.i().PIX_RAD][iCol / G.i().PIX_RAD].getColor() == player.getColor()) {
+//							gamePix[iRow / G.i().PIX_RAD][iCol / G.i().PIX_RAD].incIntensity();
+//						}
+//					}
+//					switch(player.getColor()) {
+//					case R: if(buffPix[iRow][iCol].r == 0.0f) return;
+//						buffPix[iRow][iCol].r += G.i().PIX_WEIGHT_GRAD;
+//						break;
+//					case G: if(buffPix[iRow][iCol].g == 0.0f) return;
+//						buffPix[iRow][iCol].g += G.i().PIX_WEIGHT_GRAD;
+//						break;
+//					case B: if(buffPix[iRow][iCol].b == 0.0f) return;
+//						buffPix[iRow][iCol].b += G.i().PIX_WEIGHT_GRAD;
+//						break;
+//					default:
+//					}
+//				}
+//			}
+//		}	
+		for(int iRow = 0; iRow < G.i().PIX_DIM; ++iRow) {
+			for(int iCol = 0; iCol < G.i().PIX_DIM; ++iCol) {
+				if(gamePix[iRow][iCol].getColor() == player.getColor()) {
+					if(player.inPulseRad(iRow, iCol)) {
+						gamePix[iRow][iCol].incIntensity();
+					}
+				}
+			}
+		}
+	}
+		
+
+
+	
+	/* Converts the pixmap into a 
+	 * texture to be rendered to the screen */
+	Texture textureFromPixmap() {
+		
+		Texture texture = new Texture(pixmap.getWidth(), pixmap.getHeight(), Format.RGBA8888);
+		texture.bind();
+		Gdx.gl.glTexImage2D(GL20.GL_TEXTURE_2D, 
+							0, 
+							pixmap.getGLInternalFormat(), 
+							pixmap.getWidth(),
+							pixmap.getHeight(), 
+							0, 
+							pixmap.getGLFormat(), 
+							pixmap.getGLType(), 
+							pixmap.getPixels());
+		return texture;
+		
+	}
+	
+}
